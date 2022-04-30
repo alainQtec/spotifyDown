@@ -45,43 +45,48 @@ const KnowMore = ({isModalVisible, toggleModal}) => {
               showsVerticalScrollIndicator={false}
               style={{margin: 10}}>
               {/* // Changelog  */}
-
               <View style={styles.faqOne}>
-                <Text style={styles.faqQuestion}>Changelog v1.5</Text>
+                <Text style={styles.faqQuestion}>Changelog v1.95</Text>
                 <Text style={styles.faqAnswer}>
-                  {'\u25CF'} Added Music Player
+                  {'\u25CF'} Added{' '}
+                  <Text style={{fontWeight: 'bold'}}>Custom Downloader</Text> .
+                  Long press or tap the more icon while downloading the tracks,
+                  to manually select the YT Video. This update hopefully fixes a
+                  lot of issues with Downify.
+                </Text>
+              </View>
+              <View style={styles.faqOne}>
+                <Text style={styles.faqQuestion}>Changelog v1.90</Text>
+                <Text style={styles.faqAnswer}>
+                  {'\u25CF'} Added Download Queue
                 </Text>
                 <Text style={styles.faqAnswer}>
-                  {'\u25CF'} Added Downloads section
+                  {'\u25CF'} Improved the way Downloads are handled
                 </Text>
                 <Text style={styles.faqAnswer}>
-                  {'\u25CF'} Supports Spotify Albums now
+                  {'\u25CF'} Now, same track can be downloaded in multiple
+                  playlists
                 </Text>
                 <Text style={styles.faqAnswer}>
-                  {'\u25CF'} Donation page added :)
-                </Text>
-                <Text style={styles.faqAnswer}>
-                  {'\u25CF'} UI changes and few minor changes too.
+                  {'\u25CF'} UI changes and few bug fixes
                 </Text>
               </View>
               {/* // ISSUES  */}
               <View style={styles.faqOne}>
                 <Text style={styles.faqQuestion}>Issues :(</Text>
-                <Text style={styles.faqAnswer}>
-                  {'\u25CF'} While a track(s) is downloaded from a specific
-                  playlist, the download may be cancelled if a user exists that
-                  screen, or if an other playlist is loaded. Rather, user may
-                  minimize the app
-                </Text>
-                <Text style={styles.faqAnswer}>
-                  {'\u25CF'} Few playlist may give error unexpectedly.
-                </Text>
-                <Text style={styles.faqAnswer}>
+                <Text style={{textDecorationLine: 'line-through'}}>
                   {'\u25CF'} Due to youtube policies, few songs are not
                   downloadable.
                 </Text>
+                <Text style={{textDecorationLine: 'line-through'}}>
+                  {'\u25CF'} Sometimes, other versions of the song is downloaded
+                </Text>
                 <Text style={styles.faqAnswer}>
-                  {'\u25CF'} Downloads wrong tracks
+                  {'\u25CF'} The above issues can be avoided by using the{' '}
+                  <Text style={{fontWeight: 'bold'}}>
+                    NEW Custom Downloader feature
+                  </Text>{' '}
+                  and choosing some other YT video of the same track.
                 </Text>
                 <Text style={styles.faqAnswer}>
                   {'\u25CF'} If you encounter anything else, feel free to report

@@ -22,61 +22,154 @@ import {
   windowWidth,
 } from '../common';
 import Spinner from 'react-native-spinkit';
+import {handleUnorganized} from '../redux/actions/downloadsActions';
 
 const Downloads = ({navigation}) => {
   const dispatch = useDispatch();
+  const downloadQueue = useSelector((state) => state.playlist).downloadQueue;
   const [loading, setLoading] = useState(true);
   const windowHeight = Dimensions.get('window').height;
-  const [arr, setArr] = useState([]);
+  // const [arr, setArr] = useState([]);
+  // const [playlistView, setPlaylistView] = useState();
+  const downloadsState = useSelector((state) => state.downloadsReducer);
+  const {playlists, data, isPlaylistView, activePlaylist} = downloadsState;
+  // const [playlists, setPlaylists] = useState([]);
 
-  const getFileName = async () => {
+  const getFileName = async (fn) => {
     try {
       const storedValue = await AsyncStorage.getItem(`@downloads`);
+
       const prevList = await JSON.parse(storedValue);
-      //  console.log(prevList);
+
       prevList.map(async (item) => {
         const exist = await isExist(item);
         if (exist === false) {
           const updatedList = prevList.filter((file) => file.id != item.id);
           await AsyncStorage.setItem(`@downloads`, JSON.stringify(updatedList));
-          setArr(updatedList);
-          setLoading(false);
+          // setArr(updatedList);
+          fn(updatedList);
         } else {
-          setArr(prevList);
-          setLoading(false);
+          // setArr(prevList);
+          fn(prevList);
         }
       });
+    } catch (error) {}
+  };
+
+  const getPlaylistView = async () => {
+    try {
+      const storedValue = await AsyncStorage.getItem(`@playlistView`);
+
+      const prevList = await JSON.parse(storedValue);
+
+      if (prevList !== null) {
+        dispatch({type: 'LOAD_DATA', payload: prevList});
+        let playlists = Object.keys(prevList);
+
+        playlists = playlists.filter(
+          (item) => prevList[item].tracks.length !== 0,
+        );
+
+        dispatch({type: 'LOAD_PLAYLISTS', payload: playlists});
+        setLoading(false);
+      } else {
+        setLoading(false);
+      }
     } catch (error) {
+      // console.log(error);
       setLoading(false);
     }
   };
 
+  const checkForUnorganized = (result) => {
+    AsyncStorage.getItem('@unorganized').then((storedValue) => {
+      const bool = JSON.parse(storedValue);
+      // console.log(bool);
+
+      result(bool ? true : false);
+    });
+  };
+
   useEffect(() => {
     setLoading(true);
+
     setTimeout(() => {
-      getFileName();
+      getPlaylistView();
+      checkForUnorganized((isDone) => {
+        if (!isDone) {
+          getFileName((arr) => {
+            dispatch(handleUnorganized(arr));
+          });
+        }
+      });
     }, 500);
+
+    // return () => {
+    //   IronSourceBanner.hideBanner();
+    // };
   }, []);
 
   const onRefresh = () => {
     setLoading(true);
+    checkForUnorganized((isDone) => {
+      if (!isDone) {
+        getFileName((arr) => {
+          dispatch(handleUnorganized(arr));
+        });
+      }
+    });
     setTimeout(() => {
-      getFileName();
+      getPlaylistView();
     }, 500);
   };
 
-  const handleLongPress = (item) => {
-    Vibration.vibrate(100);
-    ToastAndroid.show(`Added to Queue`, ToastAndroid.SHORT);
-    dispatch(allActions.addToQueue(item));
+  const PlaylistView = () => {
+    return (
+      <View>
+        {playlists.map((item, index) => (
+          <TouchableOpacity
+            key={index}
+            onPress={() => {
+              dispatch({type: 'SET_ACTIVE_PLAYLIST', payload: item});
+
+              navigation.navigate('TracksView');
+            }}
+            style={{
+              marginVertical: 10,
+            }}>
+            <View style={styles.itemWrapper}>
+              <Image
+                style={styles.playlistImg}
+                source={
+                  data[item].info.image
+                    ? Image.resolveAssetSource({
+                        uri: `${data[item].info.image}`,
+                      })
+                    : require('../assets/defaultPlaylist.png')
+                }
+              />
+              <View
+                style={{
+                  flex: 9,
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                }}>
+                <Text style={styles.playlistId}>{data[item].info.name}</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
   };
 
   return (
     <>
-      <View style={{flex: 1, paddingHorizontal: 10}}>
-        <View style={styles.header}>
+      <View style={{flex: 1, paddingHorizontal: 12, marginTop: 10}}>
+        {/* <View style={styles.header}>
           <Text style={styles.heading}>Downloads</Text>
-        </View>
+        </View> */}
+
         {loading ? (
           <View style={{flex: 1}}>
             <Spinner
@@ -91,9 +184,8 @@ const Downloads = ({navigation}) => {
             style={{
               flex: 1,
               justifyContent: 'flex-start',
-              marginHorizontal: 10,
             }}>
-            {arr.length === 0 ? (
+            {playlists.length === 0 ? (
               <>
                 <View
                   style={{
@@ -134,37 +226,10 @@ const Downloads = ({navigation}) => {
                 refreshControl={
                   <RefreshControl refreshing={loading} onRefresh={onRefresh} />
                 }>
-                {arr.map((item, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    onPress={() => {
-                      dispatch(allActions.playOne(item));
-                    }}
-                    style={styles.itemClickWrapper}
-                    onLongPress={() => handleLongPress(item)}>
-                    <View style={styles.itemWrapper}>
-                      <Image
-                        style={styles.trackArtwork}
-                        source={{uri: `${item.artwork}`}}
-                      />
-                      <View
-                        style={{
-                          flex: 9,
-                          flexDirection: 'column',
-                          justifyContent: 'center',
-                        }}>
-                        <Text style={styles.trackTitle}>{item.title}</Text>
-                        <Text style={styles.trackInfo}>
-                          {item.artist} - {item.album}
-                        </Text>
-                      </View>
-                      {/* <Text style={{color: 'white', alignSelf: 'center'}}>
-                      {Math.floor(item?.duration)}
-                    </Text> */}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-                <View style={{height: windowHeight * 0.06}} />
+                {/* <Unorganized /> */}
+                <PlaylistView />
+
+                <View style={{height: windowHeight * 0.07}} />
               </ScrollView>
             )}
           </View>
@@ -189,11 +254,17 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: '5%',
   },
-  itemClickWrapper: {flex: 1, marginBottom: 15},
   itemWrapper: {
     flex: 1,
     flexDirection: 'row',
     height: windowHeight * 0.07,
+  },
+  itemClickWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    height: windowHeight * 0.07,
+    marginBottom: 50,
+    backgroundColor: 'blue',
   },
   trackTitle: {
     color: 'white',
@@ -231,5 +302,21 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontFamily: 'Gotham',
     textTransform: 'uppercase',
+  },
+  playlistId: {
+    color: 'white',
+    fontSize: 17,
+    justifyContent: 'flex-start',
+    fontFamily: 'GothamMedium',
+    fontWeight: 'bold',
+  },
+  playlistImg: {
+    flex: 1.5,
+    marginLeft: 7,
+    marginRight: 12,
+    height: '100%',
+    aspectRatio: 1 / 1,
+    alignSelf: 'center',
+    padding: 6,
   },
 });

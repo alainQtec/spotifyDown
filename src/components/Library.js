@@ -4,11 +4,17 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  ToastAndroid,
   TouchableOpacity,
   View,
 } from 'react-native';
+
 import KnowMore from './KnowMore.js';
-import SavedPlaylists from './SavedPlaylists';
+import analytics from '@react-native-firebase/analytics';
+import {
+  Ironsource,
+  IronSourceRewardedVideo,
+} from '@wowmaking/react-native-iron-source';
 
 const Library = ({navigation}) => {
   const [isModalVisible, setModalVisible] = useState(false);
@@ -17,10 +23,43 @@ const Library = ({navigation}) => {
     setModalVisible(!isModalVisible);
   };
 
-  const BetterKnowMore = React.memo(KnowMore);
   useEffect(() => {
-    // console.log("rendered")
+    IronSourceRewardedVideo.addEventListener(
+      'ironSourceRewardedVideoAvailable',
+      (res) => {},
+    );
+
+    IronSourceRewardedVideo.addEventListener(
+      'ironSourceRewardedVideoAdRewarded',
+      async () => {
+        ToastAndroid.show(
+          'Thanks for watching the Ad. It will help in the development of Project',
+          ToastAndroid.LONG,
+        );
+        await analytics().logEvent('rewardedAd_shown');
+      },
+    );
+
+    IronSourceRewardedVideo.initializeRewardedVideo();
   }, []);
+
+  const showAd = async () => {
+    await analytics().logEvent('rewardedAd_clicked');
+
+    IronSourceRewardedVideo.isRewardedVideoAvailable().then((available) => {
+      if (available) {
+        IronSourceRewardedVideo.showRewardedVideo();
+      } else {
+        ToastAndroid.show(
+          'Ad is not available right now. Thanks tho ✨',
+          ToastAndroid.SHORT,
+        );
+      }
+    });
+  };
+
+  const BetterKnowMore = React.memo(KnowMore);
+
   return (
     <>
       <View
@@ -32,7 +71,8 @@ const Library = ({navigation}) => {
         </View>
         <View style={styles.actions}>
           <ScrollView alwaysBounceVertical={true}>
-            <TouchableOpacity onPress={() => navigation.navigate('Downloads')}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('DownloadStack')}>
               <View style={styles.optionWrapper}>
                 <Image
                   source={require('../assets/down.png')}
@@ -48,10 +88,9 @@ const Library = ({navigation}) => {
                   source={require('../assets/heart.png')}
                   style={styles.optionIcon}
                 />
-                <Text style={styles.buttons}>Saved</Text>
+                <Text style={styles.buttons}>Saved Playlists</Text>
               </View>
             </TouchableOpacity>
-
             <TouchableOpacity onPress={toggleModal}>
               <View style={styles.optionWrapper}>
                 <Image
@@ -61,13 +100,32 @@ const Library = ({navigation}) => {
                 <Text style={styles.buttons}>Know More</Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('Donations')}>
+            {/* <TouchableOpacity
+              onPress={() => {
+                // console.log(RNFS.ExternalDirectoryPath);
+                // console.log(DOWNLOAD_PATH);
+
+              }}>
               <View style={styles.optionWrapper}>
                 <Image
                   source={require('../assets/red-heart.png')}
                   style={styles.optionIcon}
                 />
                 <Text style={styles.buttons}>Support the App</Text>
+              </View>
+            </TouchableOpacity> */}
+            <TouchableOpacity onPress={showAd}>
+              <View style={styles.optionWrapper}>
+                <Image
+                  source={require('../assets/reward.png')}
+                  style={styles.optionIcon}
+                />
+                <View>
+                  <Text style={styles.buttons}>Watch a Rewarded Ad</Text>
+                  <Text style={styles.smallText}>
+                    This will help in the development of this App ✨
+                  </Text>
+                </View>
               </View>
             </TouchableOpacity>
             <BetterKnowMore
@@ -103,6 +161,11 @@ const styles = StyleSheet.create({
   buttons: {
     fontSize: 20,
     color: 'white',
+    fontFamily: 'GothamMedium',
+  },
+  smallText: {
+    fontSize: 12,
+    color: 'gray',
     fontFamily: 'Gotham',
   },
   optionWrapper: {
@@ -111,7 +174,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 10,
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     backgroundColor: '#111111',
     borderRadius: 10,
   },

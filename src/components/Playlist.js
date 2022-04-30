@@ -10,109 +10,61 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  PermissionsAndroid,
+  Vibration,
   Linking,
 } from 'react-native';
 import Snackbar from 'react-native-snackbar';
-import RNBackgroundDownloader from 'react-native-background-downloader';
-import RNFetchBlob from 'rn-fetch-blob';
+import Modal from 'react-native-modal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Spinner from 'react-native-spinkit';
-import analytics from '@react-native-firebase/analytics';
 import TextTicker from 'react-native-text-ticker';
 
-import {API} from '@env';
+import {NEW_API} from '@env';
 import {windowWidth, windowHeight} from '../common';
 
-const perm = async () => {
-  try {
-    const granted = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-      {
-        title: 'Required to download files',
-        message: 'Needs to save the mp3 files',
-        buttonNeutral: 'Ask Me Later',
-        buttonNegative: 'Cancel',
-        buttonPositive: 'OK',
-      },
-    );
-    if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-      //console.log('You can use the Storage');
-      return true;
-    } else {
-      //console.log('Storage permission denied');
-      return false;
-    }
-  } catch (error) {
-    //console.log(error);
-    return false;
-  }
-};
+import {
+  addNewPlaylist,
+  addToDownloadQueue,
+} from '../redux/actions/playlistActions';
+import CustomDownload from './CustomDownload';
 
 const Playlist = ({navigation, route}) => {
-  const [loading, setLoading] = useState(true);
+  // const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [tracks, setTracks] = useState([]);
-  const [responseData, setResponseData] = useState({});
+  // const [tracks, setTracks] = useState([]);
+  // const [responseData, setResponseData] = useState({});
 
-  const [visible, setVisible] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [isVisible, setIsVisible] = useState(false);
   const [downloadPercent, setDownloadPercent] = useState(0);
-  const [curentDownloading, setCurentDownloading] = useState(null);
+  // const [curentDownloading, setCurentDownloading] = useState(null);
 
   const isFocused = useIsFocused();
-  const URlID = useSelector((state) => state.playlist);
+  const URlID = useSelector((state) => state.playlist).id;
 
   const dispatch = useDispatch();
-
-  const checkExists = async (single) => {
-    // const path = `${RNBackgroundDownloader.directories.documents}/${playlistData.playlistId}/${single.name}.mp3`;
-    const path = `${RNBackgroundDownloader.directories.documents}/${single.title}.mp3`;
-    const exists = await RNFetchBlob.fs.exists(path);
-
-    //console.log(exists, path)
-    if (exists) {
-      const stats = await RNFetchBlob.fs.stat(path);
-
-      if (stats.size === 0) return {...single};
-      else return {...single, downloaded: true, path: path};
-    } else {
-      return {...single};
-    }
-
-    // console.log(exists)
-  };
-
-  const checkData = (data) => {
-    return Promise.all(data.map((item) => checkExists(item)));
-  };
+  const state = useSelector((state) => state.playlist);
+  const {responseInfo, tracks} = state.currentPlaylist;
+  const {loading, currentDownloading, downloadQueue} = state;
 
   const fetchData = async () => {
     try {
-      let api = `${API}/redirect?id=${URlID}`;
+      let api = `${NEW_API}/redirect?id=${URlID}`;
       const response = await fetch(api, {
         method: 'GET',
+        headers: {},
       });
-
-      if (response.status === 200) {
+      // const text = await response.text();
+      // console.log('Error', response.status);
+      if (response) {
         response
           .json()
           .then((res) => {
-            setResponseData(res.responseInfo);
-            checkData(res.tracks).then(async (data) => {
-              // console.log(data)
-              setTracks(data);
-              setLoading(false);
-              setError(false);
-              await analytics().logEvent('playlist_view', {
-                id: responseData.id,
-                name: responseData.name,
-                type: responseData.type,
-              });
-            });
+            dispatch(addNewPlaylist(res));
           })
           .catch((err) => {
             console.log(err);
-            setLoading(false);
+            // setLoading(false);
             setError(true);
             //navigation.goBack();
             Alert.alert(
@@ -129,208 +81,44 @@ const Playlist = ({navigation, route}) => {
       }
     } catch (error) {
       setTimeout(() => {
-        Alert.alert(
-          'Please check if Internet is available',
-          'Internet is required to fetch the tracks and other data. \nYou can listen to Downloaded Tracks while being OFFLINE',
-          [
-            {
-              text: 'Open settings',
-              onPress: () => {
-                Linking.openURL('');
-              },
-            },
-          ],
-          {cancelable: true},
-        );
         navigation.goBack();
-      }, 2000);
+        Snackbar.show({
+          text: 'Internt connection is required to fetch playlist',
+          duration: Snackbar.LENGTH_LONG,
+          backgroundColor: 'red',
+        });
+      }, 1000);
     }
   };
 
   useEffect(() => {
-    setLoading(true);
+    // setLoading(true);
+    // console.log(state);
+    dispatch({type: 'LOADING_TRUE'});
 
     fetchData();
+
+    // return () => {
+    //   const [loading, setLoading] = useState(true);
+    //   const [error, setError] = useState(false);
+    //   const [tracks, setTracks] = useState([]);
+    //   const [responseData, setResponseData] = useState({});
+    // };
   }, [isFocused]);
 
-  const downloader = async (single) => {
-    const api = `${API}/download?`;
-    const req = perm();
-    const fileStatus = await checkExists(single);
-    if (req) {
-      if (!fileStatus.path) {
-        setVisible(true);
-        setCurentDownloading(single.id);
-        let artistsString = single.artist.map((item) => item.name).join();
-        let passedQuery = single.title + ' ' + single.album + ' ' + artistsString;
-        const params = {
-          title : single.title,
-          album : single.album,
-          artistsString
-        }
-        const url = new URL(api);
-        let query = Object.keys(params)
-             .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k]))
-             .join('&');
-        // url.search = new URLSearchParams(params).toString();
-        //console.log(api+query);
-        const response = await fetch(api+query);
-
-        response.json()
-        .then((res) => {
-          //  console.log('link fetched ....');
-          let link = res.url;
-          let duration = res.duration;
-
-          let promise = new Promise((resolve, reject) => {
-            if (link) {
-              let task = RNBackgroundDownloader.download({
-                id: single.title,
-                url: `${link}`,
-                destination: `${RNBackgroundDownloader.directories.documents}/${single.title}.mp3`,
-              })
-                .begin((expectedBytes) => {
-                  // console.log(`Going to download ${expectedBytes} bytes!`);
-                  setVisible(true);
-                  setDownloadPercent(0);
-                })
-                .progress((percent) => {
-                  // console.log(`Downloaded: ${percent * 100}%`);
-                  setDownloadPercent(percent);
-                })
-                .done(async () => {
-                  //console.log('Download is done!');
-
-                  const path = `${RNBackgroundDownloader.directories.documents}/${single.title}.mp3`;
-
-                  setTracks((prev) => {
-                    const nextState = prev.map((item) =>
-                      item.id == single.id
-                        ? {
-                            ...item,
-                            downloaded: true,
-                            path: path,
-                            duration: duration,
-                          }
-                        : item,
-                    );
-
-                    return nextState;
-                  });
-
-                  try {
-                    const newDownload = {
-                      id: single.id,
-                      title: single.title,
-                      artist: single.artist[0].name,
-                      album: single.album,
-                      artwork: single.artwork,
-                      url: path,
-                      duration: duration,
-                    };
-                    const storedValue = await AsyncStorage.getItem(
-                      `@downloads`,
-                    );
-                    const prevList = await JSON.parse(storedValue);
-
-                    if (!prevList) {
-                      const newList = [newDownload];
-                      await AsyncStorage.setItem(
-                        `@downloads`,
-                        JSON.stringify(newList),
-                      );
-                      //console.log(newDownload)
-                      Snackbar.show({
-                        text: 'First Track added to Downloads',
-                        duration: Snackbar.LENGTH_SHORT,
-                        backgroundColor: 'red',
-                      });
-                    } else {
-                      prevList.push(newDownload);
-                      await AsyncStorage.setItem(
-                        `@downloads`,
-                        JSON.stringify(prevList),
-                      );
-                      Snackbar.show({
-                        text: 'Track added to Downloads',
-                        duration: Snackbar.LENGTH_SHORT,
-                        backgroundColor: 'red',
-                      });
-                    }
-                  } catch (err) {
-                    //console.log(err);
-                  }
-
-                  // dispatch(allActions.downloadOne(single, path));
-
-                  setVisible(false);
-                  resolve(path);
-                  setDownloadPercent(1);
-                  setCurentDownloading(null);
-                })
-                .error((error) => {
-                  console.log('Download canceled due to error: ', error);
-                  setDownloadPercent(0);
-                  setVisible(false);
-                  setCurentDownloading(null);
-
-                  Snackbar.show({
-                    text:
-                      'Pardon!  Could not download this particular file due to Youtube policies',
-                    duration: Snackbar.LENGTH_SHORT,
-                    backgroundColor: 'red',
-                  });
-                  resolve('Failed');
-                });
-            } else {
-              setDownloadPercent(0);
-                  setVisible(false);
-                  setCurentDownloading(null);
-              Snackbar.show({
-                text: 'Server Error',
-                duration: Snackbar.LENGTH_SHORT,
-                backgroundColor: 'red',
-              });
-            }
-          });
-
-          return promise;
-        })
-        .catch((error) => {
-                  console.log('Download canceled due to error: ', error);
-                  setDownloadPercent(0);
-                  setVisible(false);
-                  setCurentDownloading(null);
-
-                  Snackbar.show({
-                    text:
-                      'Something went wrong in the server',
-                    duration: Snackbar.LENGTH_SHORT,
-                    backgroundColor: 'red',
-                  });
-                  //resolve('Failed');
-                })
-      }
-    } else {
-      Alert.alert(
-        'Storage Permision Denied',
-        'Unable to save',
-        [{text: 'OK', onPress: () => {}}],
-        {cancelable: false},
-      );
-    }
+  const handleDownload = (item) => {
+    dispatch(addToDownloadQueue(item));
   };
 
   const downloadAll = async () => {
-    let promise = new Promise(async (resolve, reject) => {
-      for (let i = 0; i < tracks.length; i++) {
-        let result = await downloader(tracks[i]);
+    tracks.map((item) => {
+      if (!item.downloaded) {
+        // console.log(item);
+        setTimeout(() => {
+          handleDownload(item);
+        }, 2000);
       }
-      // setPlaylistData(prev => ({...prev, downloaded : true}) )
-      resolve('Playlist Downloaded');
     });
-
-    return promise;
   };
 
   const handleDownloadAll = async () => {
@@ -351,12 +139,12 @@ const Playlist = ({navigation, route}) => {
   };
 
   const savePlaylist = async () => {
-    if (responseData.saved == false) {
+    if (responseInfo.saved == false) {
       try {
         const playlistToAdd = {
-          id: responseData.id,
-          name: responseData.name,
-          image: responseData.image,
+          id: responseInfo.id,
+          name: responseInfo.name,
+          image: responseInfo.image,
         };
 
         const storedValue = await AsyncStorage.getItem(`@saved_playlists`);
@@ -377,7 +165,7 @@ const Playlist = ({navigation, route}) => {
             !item.saved ? {...item, saved: true} : item,
           );
         } else {
-          const exists = prevList.some((item) => item.id === responseData.id);
+          const exists = prevList.some((item) => item.id === responseInfo.id);
 
           if (!exists) {
             prevList.push(playlistToAdd);
@@ -391,32 +179,34 @@ const Playlist = ({navigation, route}) => {
               duration: Snackbar.LENGTH_LONG,
               backgroundColor: 'red',
             });
-            setResponseData((item) =>
-              !item.saved ? {...item, saved: true} : item,
-            );
+            dispatch({type: 'SAVE_PLAYLIST'});
           } else {
             Snackbar.show({
               text: 'Playlist already exists in Library',
               duration: Snackbar.LENGTH_LONG,
               backgroundColor: 'red',
             });
-            setResponseData((item) =>
-              !item.saved ? {...item, saved: true} : item,
-            );
+            dispatch({type: 'SAVE_PLAYLIST'});
           }
           // console.log(prevList)
         }
       } catch (err) {
-        console.log(err);
+        // console.log(err);
       }
     }
   };
 
   const openFile = (single) => {
-    navigation.navigate('LibraryStack', {screen: 'Downloads'});
+    navigation.navigate('LibraryStack', {screen: 'DownloadStack'});
   };
 
   const onRequestClose = () => null;
+
+  const handleCustomDownload = (item) => {
+    setIsVisible(false);
+    navigation.navigate('CustomDownload');
+    dispatch({type: 'SET_CUSTOM_ITEM', payload: selected});
+  };
 
   return (
     <>
@@ -439,9 +229,9 @@ const Playlist = ({navigation, route}) => {
                   flex: 0.9,
                   flexDirection: 'column',
                 }}>
-                {responseData.image ? (
+                {responseInfo.image ? (
                   <Image
-                    source={{uri: responseData.image}}
+                    source={{uri: responseInfo.image}}
                     style={{
                       height: '100%',
                       aspectRatio: 1 / 1,
@@ -471,7 +261,7 @@ const Playlist = ({navigation, route}) => {
                     scroll={false}
                     repeatSpacer={150}
                     marqueeDelay={2000}>
-                    {responseData.name}
+                    {responseInfo.name}
                   </TextTicker>
                 </View>
               </View>
@@ -502,7 +292,7 @@ const Playlist = ({navigation, route}) => {
                         backgroundColor: 'red',
                       });
                     }}>
-                    {responseData.saved ? (
+                    {responseInfo.saved ? (
                       <Image
                         source={require('../assets/red-heart.png')}
                         style={{height: 30, width: 30}}
@@ -524,35 +314,22 @@ const Playlist = ({navigation, route}) => {
               {tracks.map((item, index) => {
                 return (
                   <View key={index} style={styles.list}>
-                    {item.downloaded ? (
-                      <View style={{flex: 0.7}}>
-                        <TouchableOpacity
-                          onPress={() => {
-                            openFile(item);
-                          }}>
-                          <Text style={styles.trackTitle}>{item.title}</Text>
-                          <Text style={styles.trackInfo}>
-                            {item?.artist[0].name} - {item.album}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <View style={{flex: 0.7}}>
-                        <Text style={styles.trackTitle}>{item.title}</Text>
-                        <Text style={styles.trackInfo}>
-                          {item?.artist[0].name} - {item.album}
-                        </Text>
-                      </View>
-                    )}
+                    <TouchableOpacity style={{flex: 0.7}}>
+                      <Text style={styles.trackTitle}>{item.title}</Text>
+                      <Text style={styles.trackInfo}>
+                        {item?.artist[0].name} - {item.album}
+                      </Text>
+                    </TouchableOpacity>
+
                     {item.downloaded ? (
                       <TouchableOpacity
                         style={{
-                          flex: 0.3,
+                          flex: 0.2,
                           alignItems: 'flex-end',
                           justifyContent: 'center',
                         }}
                         onPress={() => {
-                          openFile(item);
+                          // openFile(item);
                         }}>
                         <Image
                           source={require('../assets/check.png')}
@@ -567,12 +344,12 @@ const Playlist = ({navigation, route}) => {
                     ) : (
                       <TouchableOpacity
                         style={{
-                          flex: 0.3,
+                          flex: 0.2,
                           alignItems: 'flex-end',
                           justifyContent: 'center',
                         }}
-                        onPress={() => downloader(item)}>
-                        {visible && curentDownloading === item.id ? (
+                        onPress={() => handleDownload(item)}>
+                        {currentDownloading.includes(item) ? (
                           <Spinner
                             style={{marginBottom: 7, justifyContent: 'center'}}
                             size={30}
@@ -592,6 +369,29 @@ const Playlist = ({navigation, route}) => {
                         )}
                       </TouchableOpacity>
                     )}
+                    <TouchableOpacity
+                      style={{
+                        flex: 0.1,
+                        alignItems: 'flex-end',
+                        justifyContent: 'center',
+                      }}
+                      onPress={() => {
+                        setSelected(item);
+
+                        // console.log('Handle cystom', item);
+                        Vibration.vibrate(50);
+                        setIsVisible(true);
+                      }}>
+                      <Image
+                        source={require('../assets/more.png')}
+                        style={{
+                          height: 30,
+                          width: 30,
+
+                          justifyContent: 'center',
+                        }}
+                      />
+                    </TouchableOpacity>
                   </View>
                 );
               })}
@@ -600,6 +400,44 @@ const Playlist = ({navigation, route}) => {
           </View>
         </>
       )}
+      <Modal
+        isVisible={isVisible}
+        animationIn={'slideInUp'}
+        animationOut={'slideOutDown'}
+        onBackdropPress={() => setIsVisible(false)}
+        onBackButtonPress={() => setIsVisible(false)}
+        swipeDirection={['down']}
+        propagateSwipe={true}
+        useNativeDriver={true}
+        deviceWidth={windowWidth}
+        style={{justifyContent: 'flex-end', margin: 0}}>
+        <View style={styles.customModalOverlay}>
+          <TouchableOpacity
+            style={styles.trackOptionTouchable}
+            onPress={() => {
+              handleCustomDownload();
+            }}>
+            <Image
+              source={require('../assets/down.png')}
+              style={{width: 20, height: 20}}
+            />
+            <Text style={styles.trackOptionText}>
+              Manually choose Youtube video
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.trackOptionTouchable}
+            onPress={() => {
+              setIsVisible(false);
+            }}>
+            <Image
+              source={require('../assets/cancel.png')}
+              style={{width: 22, height: 22}}
+            />
+            <Text style={styles.trackOptionText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </>
   );
 };
@@ -674,5 +512,23 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     marginVertical: 10,
+  },
+  customModalOverlay: {
+    height: windowHeight * 0.15,
+    width: windowWidth,
+    backgroundColor: '#181818',
+    paddingHorizontal: 10,
+  },
+  trackOptionTouchable: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    height: '40%',
+  },
+  trackOptionText: {
+    fontSize: 17,
+    color: 'white',
+    fontFamily: 'Roboto',
+    marginLeft: 15,
   },
 });

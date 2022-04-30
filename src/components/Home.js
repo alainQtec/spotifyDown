@@ -10,12 +10,31 @@ import {
 } from 'react-native';
 import messaging from '@react-native-firebase/messaging';
 import {spotifyGreenButton, spotifyGreenButtonText} from '../common';
+import {IronSource} from '@wowmaking/react-native-iron-source';
+import {LogBox} from 'react-native';
+LogBox.ignoreLogs([
+  'Require cycle:',
+  '`new NativeEventEmitter()` ',
+  'EventEmitter.removeListener',
+]);
 
 const App = ({navigation, route}) => {
   useEffect(() => {
     const unsubscribe = messaging().onMessage(async (remoteMessage) => {
       Alert.alert('A new FCM message arrived!', JSON.stringify(remoteMessage));
     });
+
+    IronSource.initializeIronSource('118aa3d25', 'downify', {
+      validateIntegration: true,
+    })
+      .then((e) => {
+        // console.log('Init finished');
+        // console.log(e);
+      })
+      .catch(() => {
+        console.log('error');
+      });
+
     return unsubscribe;
   }, []);
 

@@ -1,7 +1,7 @@
-import RNBackgroundDownloader from 'react-native-background-downloader';
 import {Dimensions} from 'react-native';
+import RNFS from 'react-native-fs';
 
-export const DOWNLOAD_PATH = `${RNBackgroundDownloader.directories.documents}`;
+export const DOWNLOAD_PATH = `${RNFS.ExternalDirectoryPath}`;
 export const windowHeight = Dimensions.get('window').height;
 export const windowWidth = Dimensions.get('window').width;
 
@@ -24,4 +24,10 @@ export const spotifyGreenButtonText = {
   fontFamily: 'GothamMedium',
   fontWeight: '700',
   textTransform: 'uppercase',
+};
+
+const config = {
+  maxAdContentRating: 'T',
+  tagForChildDirectedTreatment: false,
+  tagForUnderAgeConsent: false,
 };

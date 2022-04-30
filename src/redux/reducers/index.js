@@ -1,11 +1,11 @@
-import {combineReducers} from "redux";
-import {playlist ,  downloadSong} from "./PlaylistReducer";
-import {playerReducer} from "./playerReducer"
-
+import {combineReducers} from 'redux';
+import {playlist} from './PlaylistReducer';
+import {playerReducer} from './playerReducer';
+import {downloadsReducer} from './downloadsReducer';
 const rootReducers = combineReducers({
-    playlist,
-    downloadSong,
-    player : playerReducer
+  playlist,
+  downloadsReducer,
+  player: playerReducer,
 });
 
 export default rootReducers;

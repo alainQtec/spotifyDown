@@ -1,42 +1,56 @@
 import React, {useEffect, useState} from 'react';
-import {StyleSheet, Text, View, TouchableOpacity, Image} from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Image,
+  TouchableWithoutFeedback,
+} from 'react-native';
 import TrackPlayer, {
   usePlaybackState,
   useTrackPlayerEvents,
+  Capability,
+  Event,
+  State,
 } from 'react-native-track-player';
 
-import {useDispatch, useSelector} from 'react-redux';
-import allActions from '../redux/actions/index';
+import {useDispatch} from 'react-redux';
+
 import {windowHeight} from '../common';
 import TextTicker from 'react-native-text-ticker';
+import {useNavigation} from '@react-navigation/native';
 
 const MiniPlayer = () => {
   const [isTrackPlayerInit, setIsTrackPlayerInit] = useState(false);
   const [trackTitle, setTrackTitle] = useState('');
   const [trackAlbum, setTrackAlbum] = useState('');
   const [trackArtist, setTrackArtist] = useState('');
-  const dispatch = useDispatch();
+  // const dispatch = useDispatch();
+  const navigation = useNavigation();
 
   const playbackState = usePlaybackState();
 
-  const trackPlayerInit = async (queue) => {
-    await TrackPlayer.setupPlayer();
+  const trackPlayerInit = async () => {
+    await TrackPlayer.setupPlayer({});
     await TrackPlayer.updateOptions({
       stopWithApp: true,
       alwaysPauseOnInterruption: false,
       capabilities: [
-        TrackPlayer.CAPABILITY_PLAY,
-        TrackPlayer.CAPABILITY_PAUSE,
-        TrackPlayer.CAPABILITY_STOP,
-        TrackPlayer.CAPABILITY_SKIP_TO_NEXT,
-        TrackPlayer.CAPABILITY_SKIP_TO_PREVIOUS,
-        TrackPlayer.CAPABILITY_SEEK_TO,
+        Capability.Play,
+        Capability.Play,
+        Capability.Pause,
+        Capability.SkipToNext,
+        Capability.SkipToPrevious,
+        Capability.Stop,
+        Capability.SeekTo,
       ],
       compactCapabilities: [
-        TrackPlayer.CAPABILITY_PLAY,
-        TrackPlayer.CAPABILITY_PAUSE,
-        TrackPlayer.CAPABILITY_SKIP_TO_NEXT,
-        TrackPlayer.CAPABILITY_SKIP_TO_PREVIOUS,
+        Capability.Play,
+        Capability.Play,
+        Capability.Pause,
+        Capability.SkipToNext,
+        Capability.SkipToPrevious,
       ],
       icon: require('../assets/notification_icon.png'),
     });
@@ -55,36 +69,48 @@ const MiniPlayer = () => {
     };
 
     startPlayer();
+
     return async () => {
       TrackPlayer.destroy();
     };
   }, []);
 
-  useTrackPlayerEvents(['playback-track-changed'], async (event) => {
-    if (event.type === TrackPlayer.TrackPlayerEvents.PLAYBACK_TRACK_CHANGED) {
-      const track = await TrackPlayer.getTrack(event.nextTrack);
-      const {title, artist, album} = track || {
-        title: 'Play something 🎶',
-        artist: 'Go to Library->',
-        album: 'Downloads-> Play a track 🎵',
-      };
+  useTrackPlayerEvents(
+    [Event.PlaybackTrackChanged, Event.PlaybackState],
+    async (event) => {
+      if (
+        event.type === Event.PlaybackTrackChanged &&
+        event.nextTrack !== undefined
+      ) {
+        const track = await TrackPlayer.getTrack(event.nextTrack);
+        const {title, artist, album} = track || {};
+        // {
+        //   title: 'Play something 🎶',
+        //   artist: 'Go to Library->',
+        //   album: 'Downloads-> Play a track 🎵',
+        // };
 
-      setTrackTitle(title);
-      setTrackArtist(artist);
-      setTrackAlbum(album);
-    }
-  });
+        setTrackTitle(title);
+        setTrackArtist(artist);
+        setTrackAlbum(album);
+      }
+      if (event.type === Event.PlaybackState && event.state === State.Stopped) {
+        setTrackTitle('');
+        setTrackArtist('');
+        setTrackAlbum('');
+      }
+    },
+  );
 
   const togglePlayback = async () => {
     const currentTrack = await TrackPlayer.getCurrentTrack();
 
     // console.log(await TrackPlayer.getQueue());
     if (currentTrack == null) {
-      await TrackPlayer.reset();
-
+      // await TrackPlayer.reset();
       // await TrackPlayer.play();
     } else {
-      if (playbackState === TrackPlayer.STATE_PAUSED) {
+      if (playbackState === State.Paused) {
         await TrackPlayer.play();
       } else {
         await TrackPlayer.pause();
@@ -105,7 +131,10 @@ const MiniPlayer = () => {
   };
 
   return (
-    <>
+    <TouchableWithoutFeedback
+      onPress={() => {
+        // navigation.navigate('Player');
+      }}>
       <View style={[styles.box]}>
         <View style={styles.playerView}>
           <View style={styles.trackInfo}>
@@ -123,10 +152,22 @@ const MiniPlayer = () => {
               scroll={false}
               repeatSpacer={150}
               marqueeDelay={100}>
-              <Text>{trackTitle} </Text>
-              <Text style={{color: 'gray', fontSize: 12}}>
-                {'\u25CF'} {trackArtist} {'\u25CF'} {trackAlbum}
-              </Text>
+              {trackTitle === '' ? (
+                <Text>
+                  Play something 🎶{' '}
+                  <Text style={{color: 'gray', fontSize: 12}}>
+                    {'\u25CF'} Go to Library{'->'} {'\u25CF'} Downloads{'->'}{' '}
+                    Select a Playlist 🔖{'->'} Play a track 🎵
+                  </Text>
+                </Text>
+              ) : (
+                <Text>
+                  {trackTitle}{' '}
+                  <Text style={{color: 'gray', fontSize: 12}}>
+                    {'\u25CF'} {trackArtist} {'\u25CF'} {trackAlbum}
+                  </Text>
+                </Text>
+              )}
             </TextTicker>
           </View>
 
@@ -141,7 +182,7 @@ const MiniPlayer = () => {
             <TouchableOpacity onPress={togglePlayback}>
               <Image
                 source={
-                  playbackState === TrackPlayer.STATE_PLAYING
+                  playbackState === State.Playing
                     ? require('../assets/pause.png')
                     : require('../assets/play-button.png')
                 }
@@ -157,7 +198,7 @@ const MiniPlayer = () => {
           </View>
         </View>
       </View>
-    </>
+    </TouchableWithoutFeedback>
   );
 };
 
@@ -167,7 +208,7 @@ const styles = StyleSheet.create({
   box: {
     position: 'absolute',
     width: '100%',
-    height: windowHeight * 0.06,
+    height: windowHeight * 0.065,
     justifyContent: 'center',
     bottom: windowHeight * 0.05,
     paddingVertical: windowHeight * 0.01,

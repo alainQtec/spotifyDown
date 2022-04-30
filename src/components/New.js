@@ -16,7 +16,13 @@ import {
 
 var parse = require('url-parse');
 import analytics from '@react-native-firebase/analytics';
-import {spotifyGreenButton, spotifyGreenButtonText} from '../common';
+import {
+  spotifyGreenButton,
+  spotifyGreenButtonText,
+  windowHeight,
+} from '../common';
+import {IronSourceBanner} from '@wowmaking/react-native-iron-source';
+import {useIsFocused} from '@react-navigation/core';
 
 const New = ({navigation, route}) => {
   const [id, setId] = useState('');
@@ -25,6 +31,7 @@ const New = ({navigation, route}) => {
   const [loading, setLoading] = useState(false);
 
   const dispatch = useDispatch();
+  const isFocused = useIsFocused();
 
   const fetchApi = async () => {
     setLoading(true);
@@ -80,33 +87,34 @@ const New = ({navigation, route}) => {
     }
   };
 
+  // useEffect(() => {
+  // }, [isFocused]);
+
   return (
     <>
-      <>
-        <View style={{flex: 1, backgroundColor: '#181818'}}>
-          <StatusBar backgroundColor={'#282828'} />
-          <View style={styles.container}>
-            <Image
-              source={require('../assets/Headphone-amico.png')}
-              style={styles.logo}
-            />
-          </View>
-          <View style={styles.inputBox}>
-            <TextInput
-              style={styles.input}
-              value={url}
-              onChangeText={(value) => {
-                setUrl(value);
-              }}
-              placeholder={'Enter Spotify Album/Playlist Link'}
-              placeholderTextColor={'#B3B3b3'}
-            />
-            <TouchableOpacity style={spotifyGreenButton} onPress={fetchApi}>
-              <Text style={spotifyGreenButtonText}>Submit</Text>
-            </TouchableOpacity>
-          </View>
+      <View style={{flex: 1, backgroundColor: '#181818'}}>
+        <StatusBar backgroundColor={'#282828'} />
+        <View style={styles.container}>
+          <Image
+            source={require('../assets/Headphone-amico.png')}
+            style={styles.logo}
+          />
         </View>
-      </>
+        <View style={styles.inputBox}>
+          <TextInput
+            style={styles.input}
+            value={url}
+            onChangeText={(value) => {
+              setUrl(value);
+            }}
+            placeholder={'Enter Spotify Album/Playlist Link'}
+            placeholderTextColor={'#B3B3b3'}
+          />
+          <TouchableOpacity style={spotifyGreenButton} onPress={fetchApi}>
+            <Text style={spotifyGreenButtonText}>Submit</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </>
   );
 };
